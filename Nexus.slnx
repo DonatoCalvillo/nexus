@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="Nexus/Nexus.vcxproj" Id="5ca671fd-4126-40d0-9aa4-740396288622" />
+  <Project Path="tests/Nexus.Tests.vcxproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567890" />
 </Solution>
