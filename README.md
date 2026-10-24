@@ -15,7 +15,8 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Direct web search shortcuts: `g <query>` (Google), `yt <video>` (YouTube), `gh <repo>` (GitHub), `so <error>` (Stack Overflow) — `Enter` opens the default browser
 - Direct URLs: queries starting with `http://` / `https://`, or hosts like `example.com` / `localhost:3000`, show **Abrir URL** as the first result
 - Port process lookup: `-p <port>` lists the process listening on that TCP/UDP port; `Enter` asks for confirmation before terminating it
-- Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, open URL, or kill a port process, `Esc` to dismiss
+- Native system commands: `lock`, `sleep`, `restart`, `shutdown`, `empty trash`, `kill <process>`, `mute`, `vol <0-100>`
+- Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, open URL, or run a command, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
 ## Download / install (end users)
@@ -53,6 +54,12 @@ Disable login startup:
 | Open URL in browser | `https://…`, `example.com`, `localhost:3000` |
 | Find process by port | `-p <port>` (e.g. `-p 3000`) |
 | Kill process on port | Select result → `Enter` → confirm in dialog |
+| Lock session | `lock` |
+| Suspend computer | `sleep` |
+| Restart / shut down | `restart` / `shutdown` |
+| Empty Recycle Bin | `empty trash` |
+| Kill process by name | `kill <name>` (e.g. `kill chrome`) → `Enter` → confirm |
+| Mute / set volume | `mute` / `vol <0-100>` |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |
@@ -129,6 +136,8 @@ Nexus/
 ├── include/           # Public headers
 │   ├── Calculator.h
 │   ├── WebSearch.h
+│   ├── PortLookup.h
+│   ├── SystemCommands.h
 │   ├── Constants.h
 │   ├── Types.h
 │   ├── StringUtils.h
@@ -142,12 +151,16 @@ Nexus/
 │   ├── AppIndexer.cpp
 │   ├── Calculator.cpp
 │   ├── WebSearch.cpp
+│   ├── PortLookup.cpp
+│   ├── SystemCommands.cpp
 │   ├── IconManager.cpp
 │   ├── Overlay.cpp
 │   └── Startup.cpp
 ├── tests/
 │   ├── CalculatorTests.cpp
 │   ├── WebSearchTests.cpp
+│   ├── PortLookupTests.cpp
+│   ├── SystemCommandsTests.cpp
 │   └── Nexus.Tests.vcxproj
 ├── installer/
 │   └── Nexus.iss      # Inno Setup script
@@ -162,6 +175,8 @@ Nexus/
 | `AppIndexer` | Enumerate apps, apply search filter |
 | `Calculator` | Detect and evaluate simple arithmetic expressions |
 | `WebSearch` | Prefix searches and direct URL / host detection |
+| `PortLookup` | Find / kill processes by local TCP/UDP port |
+| `SystemCommands` | Native lock / sleep / power / trash / kill / volume |
 | `IconManager` | Resolve and cache visible icons |
 | `Overlay` | Window UI, hotkey, painting |
 | `Startup` | Enable/disable launch on Windows sign-in |

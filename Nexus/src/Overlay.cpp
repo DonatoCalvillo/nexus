@@ -5,6 +5,7 @@
 #include "Constants.h"
 #include "IconManager.h"
 #include "PortLookup.h"
+#include "SystemCommands.h"
 #include "WebSearch.h"
 
 #include <commctrl.h>
@@ -30,6 +31,8 @@ static std::optional<WebAction> g_webAction;
 static std::optional<CalcResult> g_calcResult;
 static std::optional<std::uint16_t> g_portQuery;
 static std::vector<PortProcess> g_portProcesses;
+static std::optional<SystemCommand> g_systemCommand;
+static std::vector<NamedProcess> g_killProcesses;
 
 static int PortRowCount() {
     if (!g_portQuery) {
@@ -41,13 +44,59 @@ static int PortRowCount() {
     return static_cast<int>(g_portProcesses.size());
 }
 
+static int SystemCommandRowCount() {
+    if (!g_systemCommand) {
+        return 0;
+    }
+    if (g_systemCommand->kind == SystemCommandKind::KillProcess) {
+        if (g_killProcesses.empty()) {
+            return 1;
+        }
+        return static_cast<int>(g_killProcesses.size());
+    }
+    return 1;
+}
+
 static int SpecialRowCount() {
-    return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0) + PortRowCount();
+    return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0) + PortRowCount()
+        + SystemCommandRowCount();
 }
 
 static std::wstring FormatPortProcessLabel(const PortProcess& process) {
     return process.processName + L" - PID " + std::to_wstring(process.pid) + L" | "
         + process.protocolLabel + L" | puerto " + std::to_wstring(process.port);
+}
+
+static std::wstring FormatNamedProcessLabel(const NamedProcess& process) {
+    return process.processName + L" - PID " + std::to_wstring(process.pid);
+}
+
+static bool ConfirmAndKillProcess(const std::wstring& processName, unsigned long pid) {
+    const std::wstring message =
+        L"\u00BFTerminar " + processName + L" (PID " + std::to_wstring(pid) + L")?";
+    const int answer = MessageBoxW(
+        nullptr,
+        message.c_str(),
+        L"Nexus",
+        MB_YESNO | MB_ICONWARNING | MB_TASKMODAL);
+    if (answer != IDYES) {
+        return true;
+    }
+
+    if (KillProcessByPid(pid)) {
+        return true;
+    }
+
+    MessageBoxW(
+        nullptr,
+        L"No se pudo terminar el proceso. Puede requerir permisos elevados.",
+        L"Nexus",
+        MB_OK | MB_ICONERROR | MB_TASKMODAL);
+    return false;
+}
+
+static void ShowCommandFailure(const wchar_t* message) {
+    MessageBoxW(nullptr, message, L"Nexus", MB_OK | MB_ICONERROR | MB_TASKMODAL);
 }
 
 static int VisibleRowCount() {
@@ -257,16 +306,57 @@ void LaunchSelected() {
                     MB_YESNO | MB_ICONWARNING | MB_TASKMODAL);
                 if (answer == IDYES) {
                     if (!KillProcessByPid(process.pid)) {
-                        MessageBoxW(
-                            nullptr,
-                            L"No se pudo terminar el proceso. Puede requerir permisos elevados.",
-                            L"Nexus",
-                            MB_OK | MB_ICONERROR | MB_TASKMODAL);
+                        ShowCommandFailure(
+                            L"No se pudo terminar el proceso. Puede requerir permisos elevados.");
                     }
                 }
                 return;
             }
             rowOffset += static_cast<int>(g_portProcesses.size());
+        }
+    }
+
+    if (g_systemCommand) {
+        if (g_systemCommand->kind == SystemCommandKind::KillProcess) {
+            if (g_killProcesses.empty()) {
+                if (g_selectedIndex == rowOffset) {
+                    return;
+                }
+                ++rowOffset;
+            } else {
+                const int killIndex = g_selectedIndex - rowOffset;
+                if (killIndex >= 0 && killIndex < static_cast<int>(g_killProcesses.size())) {
+                    const NamedProcess process = g_killProcesses[static_cast<size_t>(killIndex)];
+                    CloseOverlay();
+                    ConfirmAndKillProcess(process.processName, process.pid);
+                    return;
+                }
+                rowOffset += static_cast<int>(g_killProcesses.size());
+            }
+        } else if (g_selectedIndex == rowOffset) {
+            const SystemCommand command = *g_systemCommand;
+            CloseOverlay();
+
+            if (command.kind == SystemCommandKind::Restart
+                || command.kind == SystemCommandKind::Shutdown
+                || command.kind == SystemCommandKind::EmptyTrash) {
+                const std::wstring prompt = L"\u00BF" + command.label + L"?";
+                const int answer = MessageBoxW(
+                    nullptr,
+                    prompt.c_str(),
+                    L"Nexus",
+                    MB_YESNO | MB_ICONWARNING | MB_TASKMODAL);
+                if (answer != IDYES) {
+                    return;
+                }
+            }
+
+            if (!ExecuteSystemCommand(command)) {
+                ShowCommandFailure(L"No se pudo ejecutar el comando.");
+            }
+            return;
+        } else {
+            ++rowOffset;
         }
     }
 
@@ -427,6 +517,12 @@ static void HandleCommand(WPARAM wParam) {
         } else {
             g_portProcesses.clear();
         }
+        g_systemCommand = TryParseSystemCommand(buffer);
+        if (g_systemCommand && g_systemCommand->kind == SystemCommandKind::KillProcess) {
+            g_killProcesses = FindProcessesByName(g_systemCommand->processName);
+        } else {
+            g_killProcesses.clear();
+        }
         g_selectedIndex = 0;
         ResizeOverlayToResults();
     }
@@ -543,6 +639,65 @@ static void PaintResultRow(
                 return;
             }
             rowOffset += static_cast<int>(g_portProcesses.size());
+        }
+    }
+
+    if (g_systemCommand) {
+        if (g_systemCommand->kind == SystemCommandKind::KillProcess) {
+            if (g_killProcesses.empty()) {
+                if (index == rowOffset) {
+                    const std::wstring emptyLabel =
+                        L"Ning\u00FAn proceso coincide con \"" + g_systemCommand->processName
+                        + L"\"";
+                    RECT textRect = {
+                        itemRect.left + 14,
+                        itemTop + 6,
+                        itemRect.right - 14,
+                        itemRect.bottom};
+                    DrawTextW(
+                        deviceContext,
+                        emptyLabel.c_str(),
+                        -1,
+                        &textRect,
+                        DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                    return;
+                }
+                ++rowOffset;
+            } else {
+                const int killIndex = index - rowOffset;
+                if (killIndex >= 0 && killIndex < static_cast<int>(g_killProcesses.size())) {
+                    const std::wstring label =
+                        FormatNamedProcessLabel(g_killProcesses[static_cast<size_t>(killIndex)]);
+                    RECT textRect = {
+                        itemRect.left + 14,
+                        itemTop + 6,
+                        itemRect.right - 14,
+                        itemRect.bottom};
+                    DrawTextW(
+                        deviceContext,
+                        label.c_str(),
+                        -1,
+                        &textRect,
+                        DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                    return;
+                }
+                rowOffset += static_cast<int>(g_killProcesses.size());
+            }
+        } else if (index == rowOffset) {
+            RECT textRect = {
+                itemRect.left + 14,
+                itemTop + 6,
+                itemRect.right - 14,
+                itemRect.bottom};
+            DrawTextW(
+                deviceContext,
+                g_systemCommand->label.c_str(),
+                -1,
+                &textRect,
+                DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            return;
+        } else {
+            ++rowOffset;
         }
     }
 
