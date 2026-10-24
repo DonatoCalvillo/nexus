@@ -16,6 +16,7 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Direct URLs: queries starting with `http://` / `https://`, or hosts like `example.com` / `localhost:3000`, show **Abrir URL** as the first result
 - Port process lookup: `-p <port>` lists the process listening on that TCP/UDP port; `Enter` asks for confirmation before terminating it
 - Native system commands: `lock`, `sleep`, `restart`, `shutdown`, `empty trash`, `kill <process>`, `mute`, `vol <0-100>`
+- Clipboard history: `clip` / `cb` (optional filter) lists the last 20 copied texts in memory; `Enter` copies the selected entry back to the clipboard
 - Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, open URL, or run a command, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
@@ -60,6 +61,7 @@ Disable login startup:
 | Empty Recycle Bin | `empty trash` |
 | Kill process by name | `kill <name>` (e.g. `kill chrome`) → `Enter` → confirm |
 | Mute / set volume | `mute` / `vol <0-100>` |
+| Clipboard history | `clip` / `cb` (e.g. `clip token`) → `Enter` copies selected text |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |
@@ -138,6 +140,7 @@ Nexus/
 │   ├── WebSearch.h
 │   ├── PortLookup.h
 │   ├── SystemCommands.h
+│   ├── ClipboardHistory.h
 │   ├── Constants.h
 │   ├── Types.h
 │   ├── StringUtils.h
@@ -153,6 +156,7 @@ Nexus/
 │   ├── WebSearch.cpp
 │   ├── PortLookup.cpp
 │   ├── SystemCommands.cpp
+│   ├── ClipboardHistory.cpp
 │   ├── IconManager.cpp
 │   ├── Overlay.cpp
 │   └── Startup.cpp
@@ -161,6 +165,7 @@ Nexus/
 │   ├── WebSearchTests.cpp
 │   ├── PortLookupTests.cpp
 │   ├── SystemCommandsTests.cpp
+│   ├── ClipboardHistoryTests.cpp
 │   └── Nexus.Tests.vcxproj
 ├── installer/
 │   └── Nexus.iss      # Inno Setup script
@@ -177,6 +182,7 @@ Nexus/
 | `WebSearch` | Prefix searches and direct URL / host detection |
 | `PortLookup` | Find / kill processes by local TCP/UDP port |
 | `SystemCommands` | Native lock / sleep / power / trash / kill / volume |
+| `ClipboardHistory` | Parse `clip` / `cb` and keep an in-memory MRU text store |
 | `IconManager` | Resolve and cache visible icons |
 | `Overlay` | Window UI, hotkey, painting |
 | `Startup` | Enable/disable launch on Windows sign-in |
