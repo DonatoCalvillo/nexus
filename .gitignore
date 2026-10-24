@@ -1,0 +1,52 @@
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+Nexus/x64/
+Nexus/x86/
+*.obj
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.exp
+*.lib
+*.dll
+*.exe
+*.recipe
+*.tlog
+*.log
+*.idb
+*.pch
+*.ipch
+*.aps
+
+## Installer output
+dist/
+installer/Output/
+
+## CMake / other
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+
+## OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+.cursor/

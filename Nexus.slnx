@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Nexus/Nexus.vcxproj" Id="5ca671fd-4126-40d0-9aa4-740396288622" />
+</Solution>
