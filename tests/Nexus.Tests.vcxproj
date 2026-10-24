@@ -152,10 +152,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CalculatorTests.cpp" />
+    <ClCompile Include="WebSearchTests.cpp" />
     <ClCompile Include="..\Nexus\src\Calculator.cpp" />
+    <ClCompile Include="..\Nexus\src\WebSearch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Nexus\include\Calculator.h" />
+    <ClInclude Include="..\Nexus\include\WebSearch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

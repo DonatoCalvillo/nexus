@@ -101,16 +101,22 @@ void TestLimits() {
 
 }  // namespace
 
+int RunWebSearchTests();
+
 int wmain() {
     TestSuccessfulEvaluations();
     TestRejections();
     TestLimits();
 
-    if (g_failures == 0) {
-        std::wcout << L"All calculator tests passed.\n";
+    const int calculatorFailures = g_failures;
+    const int webSearchFailures = RunWebSearchTests();
+    const int totalFailures = calculatorFailures + webSearchFailures;
+
+    if (totalFailures == 0) {
+        std::wcout << L"All tests passed.\n";
         return 0;
     }
 
-    std::wcerr << g_failures << L" test failure(s).\n";
+    std::wcerr << totalFailures << L" test failure(s).\n";
     return 1;
 }

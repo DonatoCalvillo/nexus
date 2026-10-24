@@ -4,6 +4,7 @@
 #include "Calculator.h"
 #include "Constants.h"
 #include "IconManager.h"
+#include "WebSearch.h"
 
 #include <commctrl.h>
 #include <cstring>
@@ -23,10 +24,15 @@ HFONT g_hFont = nullptr;
 HFONT g_hFontList = nullptr;
 HBRUSH g_bgBrush = nullptr;
 int g_selectedIndex = 0;
+static std::optional<WebAction> g_webAction;
 static std::optional<CalcResult> g_calcResult;
 
+static int SpecialRowCount() {
+    return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0);
+}
+
 static int VisibleRowCount() {
-    return (g_calcResult ? 1 : 0) + static_cast<int>(g_filteredApps.size());
+    return SpecialRowCount() + static_cast<int>(g_filteredApps.size());
 }
 
 static void ResizeOverlayToResults() {
@@ -182,14 +188,32 @@ void LaunchSelected() {
         return;
     }
 
-    if (g_calcResult && g_selectedIndex == 0) {
+    int rowOffset = 0;
+    if (g_webAction) {
+        if (g_selectedIndex == rowOffset) {
+            const std::wstring url = g_webAction->url;
+            CloseOverlay();
+
+            SHELLEXECUTEINFOW executeInfo = {};
+            executeInfo.cbSize = sizeof(executeInfo);
+            executeInfo.nShow = SW_SHOWNORMAL;
+            executeInfo.lpVerb = L"open";
+            executeInfo.lpFile = url.c_str();
+            executeInfo.fMask = SEE_MASK_FLAG_NO_UI;
+            ShellExecuteExW(&executeInfo);
+            return;
+        }
+        ++rowOffset;
+    }
+
+    if (g_calcResult && g_selectedIndex == rowOffset) {
         const std::wstring resultText = g_calcResult->formattedValue;
         CloseOverlay();
         CopyTextToClipboard(resultText);
         return;
     }
 
-    const int appIndex = g_selectedIndex - (g_calcResult ? 1 : 0);
+    const int appIndex = g_selectedIndex - SpecialRowCount();
     if (appIndex < 0 || appIndex >= static_cast<int>(g_filteredApps.size())) {
         return;
     }
@@ -338,6 +362,7 @@ static void HandleCommand(WPARAM wParam) {
         GetWindowTextW(g_hwndEdit, &buffer[0], length + 1);
         buffer.resize(length);
         UpdateFilter(buffer);
+        g_webAction = TryParseWebAction(buffer);
         g_calcResult = TryEvaluate(buffer);
         g_selectedIndex = 0;
         ResizeOverlayToResults();
@@ -373,8 +398,26 @@ static void PaintResultRow(
 
     SetTextColor(deviceContext, selected ? RGB(255, 255, 255) : RGB(197, 197, 204));
 
-    const bool isCalcRow = g_calcResult && index == 0;
-    if (isCalcRow) {
+    int rowOffset = 0;
+    if (g_webAction) {
+        if (index == rowOffset) {
+            RECT textRect = {
+                itemRect.left + 14,
+                itemTop + 6,
+                itemRect.right - 14,
+                itemRect.bottom};
+            DrawTextW(
+                deviceContext,
+                g_webAction->label.c_str(),
+                -1,
+                &textRect,
+                DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            return;
+        }
+        ++rowOffset;
+    }
+
+    if (g_calcResult && index == rowOffset) {
         RECT equalsRect = {
             itemRect.left + 12,
             itemTop + 6,
@@ -396,7 +439,7 @@ static void PaintResultRow(
         return;
     }
 
-    const int appIndex = index - (g_calcResult ? 1 : 0);
+    const int appIndex = index - SpecialRowCount();
     if (appIndex >= 0 && appIndex < static_cast<int>(g_visibleIcons.size())
         && g_visibleIcons[appIndex].icon) {
         DrawIconEx(
