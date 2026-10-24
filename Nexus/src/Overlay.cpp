@@ -1,11 +1,14 @@
 #include "Overlay.h"
 
 #include "AppIndexer.h"
+#include "Calculator.h"
 #include "Constants.h"
 #include "IconManager.h"
 
 #include <commctrl.h>
+#include <cstring>
 #include <dwmapi.h>
+#include <optional>
 #include <string>
 
 #pragma comment(lib, "Comctl32.lib")
@@ -20,6 +23,51 @@ HFONT g_hFont = nullptr;
 HFONT g_hFontList = nullptr;
 HBRUSH g_bgBrush = nullptr;
 int g_selectedIndex = 0;
+static std::optional<CalcResult> g_calcResult;
+
+static int VisibleRowCount() {
+    return (g_calcResult ? 1 : 0) + static_cast<int>(g_filteredApps.size());
+}
+
+static void ResizeOverlayToResults() {
+    const int newHeight = kHeaderHeight + VisibleRowCount() * kItemHeight;
+    SetWindowPos(
+        g_hwnd,
+        nullptr,
+        0,
+        0,
+        kWindowWidth,
+        newHeight,
+        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    InvalidateRect(g_hwnd, nullptr, TRUE);
+}
+
+static bool CopyTextToClipboard(const std::wstring& text) {
+    if (!OpenClipboard(g_hwnd)) {
+        return false;
+    }
+
+    EmptyClipboard();
+    const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!memory) {
+        CloseClipboard();
+        return false;
+    }
+
+    void* locked = GlobalLock(memory);
+    if (!locked) {
+        GlobalFree(memory);
+        CloseClipboard();
+        return false;
+    }
+
+    memcpy(locked, text.c_str(), bytes);
+    GlobalUnlock(memory);
+    SetClipboardData(CF_UNICODETEXT, memory);
+    CloseClipboard();
+    return true;
+}
 
 void ApplyWindowEffects(HWND hwnd) {
     BOOL darkMode = TRUE;
@@ -126,14 +174,27 @@ void CloseOverlay() {
 }
 
 void LaunchSelected() {
-    if (g_filteredApps.empty()) {
+    const int rowCount = VisibleRowCount();
+    if (rowCount == 0) {
         return;
     }
-    if (g_selectedIndex < 0 || g_selectedIndex >= static_cast<int>(g_filteredApps.size())) {
+    if (g_selectedIndex < 0 || g_selectedIndex >= rowCount) {
         return;
     }
 
-    const AppItem* app = g_filteredApps[g_selectedIndex];
+    if (g_calcResult && g_selectedIndex == 0) {
+        const std::wstring resultText = g_calcResult->formattedValue;
+        CloseOverlay();
+        CopyTextToClipboard(resultText);
+        return;
+    }
+
+    const int appIndex = g_selectedIndex - (g_calcResult ? 1 : 0);
+    if (appIndex < 0 || appIndex >= static_cast<int>(g_filteredApps.size())) {
+        return;
+    }
+
+    const AppItem* app = g_filteredApps[appIndex];
     const std::wstring launchPath = app->path;
     PIDLIST_ABSOLUTE launchPidl = app->pidl;
 
@@ -172,17 +233,17 @@ LRESULT CALLBACK EditSubclassProc(
 
     case WM_KEYDOWN: {
         if (wParam == VK_DOWN) {
-            if (!g_filteredApps.empty()) {
-                g_selectedIndex = (g_selectedIndex + 1) % static_cast<int>(g_filteredApps.size());
+            const int rowCount = VisibleRowCount();
+            if (rowCount > 0) {
+                g_selectedIndex = (g_selectedIndex + 1) % rowCount;
                 InvalidateRect(g_hwnd, nullptr, FALSE);
             }
             return 0;
         }
         if (wParam == VK_UP) {
-            if (!g_filteredApps.empty()) {
-                g_selectedIndex =
-                    (g_selectedIndex - 1 + static_cast<int>(g_filteredApps.size()))
-                    % static_cast<int>(g_filteredApps.size());
+            const int rowCount = VisibleRowCount();
+            if (rowCount > 0) {
+                g_selectedIndex = (g_selectedIndex - 1 + rowCount) % rowCount;
                 InvalidateRect(g_hwnd, nullptr, FALSE);
             }
             return 0;
@@ -277,54 +338,50 @@ static void HandleCommand(WPARAM wParam) {
         GetWindowTextW(g_hwndEdit, &buffer[0], length + 1);
         buffer.resize(length);
         UpdateFilter(buffer);
+        g_calcResult = TryEvaluate(buffer);
+        g_selectedIndex = 0;
+        ResizeOverlayToResults();
     }
 }
 
-static void PaintResults(HDC deviceContext) {
-    SelectObject(deviceContext, g_hFontList);
-    SetBkMode(deviceContext, TRANSPARENT);
+static void PaintResultRow(
+    HDC deviceContext,
+    int index,
+    int itemTop,
+    const RECT& itemRect,
+    bool selected) {
+    if (selected) {
+        HBRUSH selectionBrush = CreateSolidBrush(RGB(0, 114, 239));
+        HPEN selectionPen = CreatePen(PS_SOLID, 1, RGB(0, 114, 239));
+        HGDIOBJ previousBrush = SelectObject(deviceContext, selectionBrush);
+        HGDIOBJ previousPen = SelectObject(deviceContext, selectionPen);
 
-    for (int index = 0; index < static_cast<int>(g_filteredApps.size()); ++index) {
-        int itemTop = kHeaderHeight + (index * kItemHeight);
-        RECT itemRect = {12, itemTop, kWindowWidth - 12, itemTop + kItemHeight - 4};
-
-        if (index == g_selectedIndex) {
-            HBRUSH selectionBrush = CreateSolidBrush(RGB(0, 114, 239));
-            HPEN selectionPen = CreatePen(PS_SOLID, 1, RGB(0, 114, 239));
-            HGDIOBJ previousBrush = SelectObject(deviceContext, selectionBrush);
-            HGDIOBJ previousPen = SelectObject(deviceContext, selectionPen);
-
-            RoundRect(
-                deviceContext,
-                itemRect.left,
-                itemRect.top,
-                itemRect.right,
-                itemRect.bottom,
-                10,
-                10);
-
-            SelectObject(deviceContext, previousBrush);
-            SelectObject(deviceContext, previousPen);
-            DeleteObject(selectionBrush);
-            DeleteObject(selectionPen);
-        }
-
-        if (index < static_cast<int>(g_visibleIcons.size()) && g_visibleIcons[index].icon) {
-            DrawIconEx(
-                deviceContext,
-                itemRect.left + 12,
-                itemTop + 7,
-                g_visibleIcons[index].icon,
-                20,
-                20,
-                0,
-                nullptr,
-                DI_NORMAL);
-        }
-
-        SetTextColor(
+        RoundRect(
             deviceContext,
-            (index == g_selectedIndex) ? RGB(255, 255, 255) : RGB(197, 197, 204));
+            itemRect.left,
+            itemRect.top,
+            itemRect.right,
+            itemRect.bottom,
+            10,
+            10);
+
+        SelectObject(deviceContext, previousBrush);
+        SelectObject(deviceContext, previousPen);
+        DeleteObject(selectionBrush);
+        DeleteObject(selectionPen);
+    }
+
+    SetTextColor(deviceContext, selected ? RGB(255, 255, 255) : RGB(197, 197, 204));
+
+    const bool isCalcRow = g_calcResult && index == 0;
+    if (isCalcRow) {
+        RECT equalsRect = {
+            itemRect.left + 12,
+            itemTop + 6,
+            itemRect.left + 36,
+            itemRect.bottom};
+        DrawTextW(deviceContext, L"=", -1, &equalsRect, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
+
         RECT textRect = {
             itemRect.left + 44,
             itemTop + 6,
@@ -332,10 +389,54 @@ static void PaintResults(HDC deviceContext) {
             itemRect.bottom};
         DrawTextW(
             deviceContext,
-            g_filteredApps[index]->name.c_str(),
+            g_calcResult->formattedValue.c_str(),
             -1,
             &textRect,
             DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+        return;
+    }
+
+    const int appIndex = index - (g_calcResult ? 1 : 0);
+    if (appIndex >= 0 && appIndex < static_cast<int>(g_visibleIcons.size())
+        && g_visibleIcons[appIndex].icon) {
+        DrawIconEx(
+            deviceContext,
+            itemRect.left + 12,
+            itemTop + 7,
+            g_visibleIcons[appIndex].icon,
+            20,
+            20,
+            0,
+            nullptr,
+            DI_NORMAL);
+    }
+
+    if (appIndex < 0 || appIndex >= static_cast<int>(g_filteredApps.size())) {
+        return;
+    }
+
+    RECT textRect = {
+        itemRect.left + 44,
+        itemTop + 6,
+        itemRect.right - 14,
+        itemRect.bottom};
+    DrawTextW(
+        deviceContext,
+        g_filteredApps[appIndex]->name.c_str(),
+        -1,
+        &textRect,
+        DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+}
+
+static void PaintResults(HDC deviceContext) {
+    SelectObject(deviceContext, g_hFontList);
+    SetBkMode(deviceContext, TRANSPARENT);
+
+    const int rowCount = VisibleRowCount();
+    for (int index = 0; index < rowCount; ++index) {
+        const int itemTop = kHeaderHeight + (index * kItemHeight);
+        const RECT itemRect = {12, itemTop, kWindowWidth - 12, itemTop + kItemHeight - 4};
+        PaintResultRow(deviceContext, index, itemTop, itemRect, index == g_selectedIndex);
     }
 }
 
@@ -350,7 +451,7 @@ static void HandlePaint(HWND hwnd) {
     FillRect(deviceContext, &clientRect, backgroundBrush);
     DeleteObject(backgroundBrush);
 
-    if (!g_filteredApps.empty()) {
+    if (VisibleRowCount() > 0) {
         HPEN linePen = CreatePen(PS_SOLID, 1, RGB(48, 48, 54));
         HGDIOBJ previousPen = SelectObject(deviceContext, linePen);
         MoveToEx(deviceContext, 18, kHeaderHeight - 6, nullptr);

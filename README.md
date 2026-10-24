@@ -11,7 +11,8 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Optional install to Windows startup (current user, no admin)
 - Indexes Windows Apps folder plus Start Menu shortcuts
 - Substring search with up to 5 results
-- Keyboard navigation: `↑` / `↓`, `Enter` to launch, `Esc` to dismiss
+- Simple arithmetic (`10*1`, `100 / 2 * .5 + 19`): result appears as a row; `Enter` copies it (max 64 characters, 15 digits per number)
+- Keyboard navigation: `↑` / `↓`, `Enter` to launch or copy, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
 ## Download / install (end users)
@@ -41,7 +42,7 @@ Disable login startup:
 | --- | --- |
 | Show / hide overlay | `Ctrl+Space` |
 | Move selection | `↑` / `↓` |
-| Launch selected app | `Enter` |
+| Launch selected app / copy calculation | `Enter` |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |
@@ -61,6 +62,13 @@ msbuild Nexus.slnx /p:Configuration=Release /p:Platform=x64
 ```
 
 Output: `x64\Release\Nexus.exe`
+
+### Run calculator tests
+
+```powershell
+msbuild tests\Nexus.Tests.vcxproj /p:Configuration=Release /p:Platform=x64
+.\x64\Release\Nexus.Tests.exe
+```
 
 ### Build the installer
 
@@ -100,7 +108,7 @@ That runs `.github/workflows/release.yml` and publishes:
 
 You can also run the **Release** workflow manually from the Actions tab (`workflow_dispatch`).
 
-CI (`.github/workflows/ci.yml`) builds on every push/PR to `main` so regressions show up before tagging.
+CI (`.github/workflows/ci.yml`) builds Nexus and runs the calculator test suite on every push/PR to `main` so regressions show up before tagging.
 
 4. This repo already includes an **MIT** `LICENSE`.
 
@@ -109,6 +117,7 @@ CI (`.github/workflows/ci.yml`) builds on every push/PR to `main` so regressions
 ```
 Nexus/
 ├── include/           # Public headers
+│   ├── Calculator.h
 │   ├── Constants.h
 │   ├── Types.h
 │   ├── StringUtils.h
@@ -120,9 +129,13 @@ Nexus/
 │   ├── main.cpp
 │   ├── StringUtils.cpp
 │   ├── AppIndexer.cpp
+│   ├── Calculator.cpp
 │   ├── IconManager.cpp
 │   ├── Overlay.cpp
 │   └── Startup.cpp
+├── tests/
+│   ├── CalculatorTests.cpp
+│   └── Nexus.Tests.vcxproj
 ├── installer/
 │   └── Nexus.iss      # Inno Setup script
 ├── LICENSE
@@ -134,6 +147,7 @@ Nexus/
 | Module | Responsibility |
 | --- | --- |
 | `AppIndexer` | Enumerate apps, apply search filter |
+| `Calculator` | Detect and evaluate simple arithmetic expressions |
 | `IconManager` | Resolve and cache visible icons |
 | `Overlay` | Window UI, hotkey, painting |
 | `Startup` | Enable/disable launch on Windows sign-in |

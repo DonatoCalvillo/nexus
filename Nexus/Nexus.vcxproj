@@ -155,6 +155,7 @@
     <ClCompile Include="src\IconManager.cpp" />
     <ClCompile Include="src\Overlay.cpp" />
     <ClCompile Include="src\Startup.cpp" />
+    <ClCompile Include="src\Calculator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Constants.h" />
@@ -164,6 +165,7 @@
     <ClInclude Include="include\IconManager.h" />
     <ClInclude Include="include\Overlay.h" />
     <ClInclude Include="include\Startup.h" />
+    <ClInclude Include="include\Calculator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
