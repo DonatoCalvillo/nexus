@@ -1,0 +1,7 @@
+Everything SDK
+Copyright (C) 2016 David Carpenter
+
+MIT License — see Everything.h header for the full license text.
+Source: https://www.voidtools.com/support/everything/sdk/
+
+Requires the Everything search client to be running for IPC queries.

@@ -4,6 +4,7 @@
 #include "Calculator.h"
 #include "ClipboardHistory.h"
 #include "Constants.h"
+#include "FileSearch.h"
 #include "IconManager.h"
 #include "PortLookup.h"
 #include "SystemCommands.h"
@@ -38,6 +39,8 @@ static ClipboardHistoryStore g_clipboardHistory;
 static std::optional<ClipboardQuery> g_clipboardQuery;
 static std::vector<std::wstring> g_clipboardMatches;
 static bool g_suppressClipboardCapture = false;
+static std::optional<FileSearchQuery> g_fileQuery;
+static std::vector<FileSearchHit> g_fileHits;
 
 static int PortRowCount() {
     if (!g_portQuery) {
@@ -72,9 +75,23 @@ static int ClipboardRowCount() {
     return static_cast<int>(g_clipboardMatches.size());
 }
 
+static int FileSearchRowCount() {
+    if (!g_fileQuery) {
+        return 0;
+    }
+    if (g_fileHits.empty()) {
+        return 1;
+    }
+    return static_cast<int>(g_fileHits.size());
+}
+
 static int SpecialRowCount() {
     return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0) + PortRowCount()
-        + SystemCommandRowCount() + ClipboardRowCount();
+        + SystemCommandRowCount() + ClipboardRowCount() + FileSearchRowCount();
+}
+
+static std::wstring FormatFileHitLabel(const FileSearchHit& hit) {
+    return hit.fileName + L" - " + hit.fullPath;
 }
 
 static std::wstring FormatPortProcessLabel(const PortProcess& process) {
@@ -434,6 +451,31 @@ void LaunchSelected() {
         }
     }
 
+    if (g_fileQuery) {
+        if (g_fileHits.empty()) {
+            if (g_selectedIndex == rowOffset) {
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int fileIndex = g_selectedIndex - rowOffset;
+            if (fileIndex >= 0 && fileIndex < static_cast<int>(g_fileHits.size())) {
+                const std::wstring path = g_fileHits[static_cast<size_t>(fileIndex)].fullPath;
+                CloseOverlay();
+
+                SHELLEXECUTEINFOW executeInfo = {};
+                executeInfo.cbSize = sizeof(executeInfo);
+                executeInfo.nShow = SW_SHOWNORMAL;
+                executeInfo.lpVerb = L"open";
+                executeInfo.lpFile = path.c_str();
+                executeInfo.fMask = SEE_MASK_FLAG_NO_UI;
+                ShellExecuteExW(&executeInfo);
+                return;
+            }
+            rowOffset += static_cast<int>(g_fileHits.size());
+        }
+    }
+
     const int appIndex = g_selectedIndex - SpecialRowCount();
     if (appIndex < 0 || appIndex >= static_cast<int>(g_filteredApps.size())) {
         return;
@@ -602,6 +644,12 @@ static void HandleCommand(WPARAM wParam) {
             g_clipboardMatches = g_clipboardHistory.Match(g_clipboardQuery->filter);
         } else {
             g_clipboardMatches.clear();
+        }
+        g_fileQuery = TryParseFileSearchQuery(buffer);
+        if (g_fileQuery) {
+            g_fileHits = SearchFiles(*g_fileQuery, kMaxResults);
+        } else {
+            g_fileHits.clear();
         }
         g_selectedIndex = 0;
         ResizeOverlayToResults();
@@ -818,6 +866,48 @@ static void PaintResultRow(
                 return;
             }
             rowOffset += static_cast<int>(g_clipboardMatches.size());
+        }
+    }
+
+    if (g_fileQuery) {
+        if (g_fileHits.empty()) {
+            if (index == rowOffset) {
+                const std::wstring emptyLabel = g_fileQuery->nameFilter.empty()
+                    ? L"Ning\u00FAn archivo en la carpeta"
+                    : L"Ning\u00FAn archivo coincide";
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    emptyLabel.c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int fileIndex = index - rowOffset;
+            if (fileIndex >= 0 && fileIndex < static_cast<int>(g_fileHits.size())) {
+                const std::wstring label =
+                    FormatFileHitLabel(g_fileHits[static_cast<size_t>(fileIndex)]);
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    label.c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            rowOffset += static_cast<int>(g_fileHits.size());
         }
     }
 

@@ -156,11 +156,13 @@
     <ClCompile Include="PortLookupTests.cpp" />
     <ClCompile Include="SystemCommandsTests.cpp" />
     <ClCompile Include="ClipboardHistoryTests.cpp" />
+    <ClCompile Include="FileSearchTests.cpp" />
     <ClCompile Include="..\Nexus\src\Calculator.cpp" />
     <ClCompile Include="..\Nexus\src\WebSearch.cpp" />
     <ClCompile Include="..\Nexus\src\PortLookup.cpp" />
     <ClCompile Include="..\Nexus\src\SystemCommands.cpp" />
     <ClCompile Include="..\Nexus\src\ClipboardHistory.cpp" />
+    <ClCompile Include="..\Nexus\src\FileSearch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Nexus\include\Calculator.h" />
@@ -168,6 +170,7 @@
     <ClInclude Include="..\Nexus\include\PortLookup.h" />
     <ClInclude Include="..\Nexus\include\SystemCommands.h" />
     <ClInclude Include="..\Nexus\include\ClipboardHistory.h" />
+    <ClInclude Include="..\Nexus\include\FileSearch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

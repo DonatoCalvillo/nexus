@@ -97,6 +97,13 @@ jobs:
           $stage = "dist\portable"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item "x64\Release\Nexus.exe" "$stage\Nexus.exe"
+          if (Test-Path "x64\Release\Everything64.dll") {
+            Copy-Item "x64\Release\Everything64.dll" "$stage\Everything64.dll"
+          } elseif (Test-Path "third_party\Everything\Everything64.dll") {
+            Copy-Item "third_party\Everything\Everything64.dll" "$stage\Everything64.dll"
+          } else {
+            throw "Everything64.dll not found for portable zip"
+          }
           Copy-Item "LICENSE" "$stage\LICENSE"
           Copy-Item "README.md" "$stage\README.md"
           Compress-Archive -Path "$stage\*" -DestinationPath "dist\Nexus-$version-windows-x64.zip" -Force

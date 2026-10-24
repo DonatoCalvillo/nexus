@@ -17,6 +17,7 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Port process lookup: `-p <port>` lists the process listening on that TCP/UDP port; `Enter` asks for confirmation before terminating it
 - Native system commands: `lock`, `sleep`, `restart`, `shutdown`, `empty trash`, `kill <process>`, `mute`, `vol <0-100>`
 - Clipboard history: `clip` / `cb` (optional filter) lists the last 20 copied texts in memory; `Enter` copies the selected entry back to the clipboard
+- Fast file search in known folders: `doc <name>` (Documents) and `dl <name>` (Downloads), powered by the Everything SDK when Everything is running, with a Win32 fallback otherwise; `Enter` opens the selected file
 - Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, open URL, or run a command, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
@@ -62,6 +63,8 @@ Disable login startup:
 | Kill process by name | `kill <name>` (e.g. `kill chrome`) → `Enter` → confirm |
 | Mute / set volume | `mute` / `vol <0-100>` |
 | Clipboard history | `clip` / `cb` (e.g. `clip token`) → `Enter` copies selected text |
+| Search Documents | `doc <name>` (e.g. `doc informe`) → `Enter` opens the file |
+| Search Downloads | `dl <name>` (e.g. `dl factura`) → `Enter` opens the file |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |
@@ -73,6 +76,7 @@ Disable login startup:
 - Visual Studio 2022+ with **Desktop development with C++**
 - MSVC toolset (`v145`) and Windows 10 SDK
 - Optional: [Inno Setup 6](https://jrsoftware.org/isinfo.php) to build the installer
+- Optional for fastest `doc` / `dl` search: [Everything](https://www.voidtools.com/) running in the background (Nexus loads `Everything64.dll` via IPC; without it, a Win32 folder walk is used)
 
 ## Build
 
@@ -141,6 +145,7 @@ Nexus/
 │   ├── PortLookup.h
 │   ├── SystemCommands.h
 │   ├── ClipboardHistory.h
+│   ├── FileSearch.h
 │   ├── Constants.h
 │   ├── Types.h
 │   ├── StringUtils.h
@@ -157,6 +162,7 @@ Nexus/
 │   ├── PortLookup.cpp
 │   ├── SystemCommands.cpp
 │   ├── ClipboardHistory.cpp
+│   ├── FileSearch.cpp
 │   ├── IconManager.cpp
 │   ├── Overlay.cpp
 │   └── Startup.cpp
@@ -166,7 +172,10 @@ Nexus/
 │   ├── PortLookupTests.cpp
 │   ├── SystemCommandsTests.cpp
 │   ├── ClipboardHistoryTests.cpp
+│   ├── FileSearchTests.cpp
 │   └── Nexus.Tests.vcxproj
+├── third_party/
+│   └── Everything/    # Everything SDK (DLL + header notice)
 ├── installer/
 │   └── Nexus.iss      # Inno Setup script
 ├── LICENSE
@@ -183,6 +192,7 @@ Nexus/
 | `PortLookup` | Find / kill processes by local TCP/UDP port |
 | `SystemCommands` | Native lock / sleep / power / trash / kill / volume |
 | `ClipboardHistory` | Parse `clip` / `cb` and keep an in-memory MRU text store |
+| `FileSearch` | Parse `doc` / `dl`, query Everything IPC (or Win32 fallback) in Documents / Downloads |
 | `IconManager` | Resolve and cache visible icons |
 | `Overlay` | Window UI, hotkey, painting |
 | `Startup` | Enable/disable launch on Windows sign-in |
