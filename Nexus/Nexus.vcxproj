@@ -159,6 +159,7 @@
     <ClCompile Include="src\WebSearch.cpp" />
     <ClCompile Include="src\PortLookup.cpp" />
     <ClCompile Include="src\SystemCommands.cpp" />
+    <ClCompile Include="src\ClipboardHistory.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Constants.h" />
@@ -172,6 +173,7 @@
     <ClInclude Include="include\WebSearch.h" />
     <ClInclude Include="include\PortLookup.h" />
     <ClInclude Include="include\SystemCommands.h" />
+    <ClInclude Include="include\ClipboardHistory.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

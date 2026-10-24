@@ -2,6 +2,7 @@
 
 #include "AppIndexer.h"
 #include "Calculator.h"
+#include "ClipboardHistory.h"
 #include "Constants.h"
 #include "IconManager.h"
 #include "PortLookup.h"
@@ -33,6 +34,10 @@ static std::optional<std::uint16_t> g_portQuery;
 static std::vector<PortProcess> g_portProcesses;
 static std::optional<SystemCommand> g_systemCommand;
 static std::vector<NamedProcess> g_killProcesses;
+static ClipboardHistoryStore g_clipboardHistory;
+static std::optional<ClipboardQuery> g_clipboardQuery;
+static std::vector<std::wstring> g_clipboardMatches;
+static bool g_suppressClipboardCapture = false;
 
 static int PortRowCount() {
     if (!g_portQuery) {
@@ -57,9 +62,19 @@ static int SystemCommandRowCount() {
     return 1;
 }
 
+static int ClipboardRowCount() {
+    if (!g_clipboardQuery) {
+        return 0;
+    }
+    if (g_clipboardMatches.empty()) {
+        return 1;
+    }
+    return static_cast<int>(g_clipboardMatches.size());
+}
+
 static int SpecialRowCount() {
     return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0) + PortRowCount()
-        + SystemCommandRowCount();
+        + SystemCommandRowCount() + ClipboardRowCount();
 }
 
 static std::wstring FormatPortProcessLabel(const PortProcess& process) {
@@ -117,7 +132,9 @@ static void ResizeOverlayToResults() {
 }
 
 static bool CopyTextToClipboard(const std::wstring& text) {
+    g_suppressClipboardCapture = true;
     if (!OpenClipboard(g_hwnd)) {
+        g_suppressClipboardCapture = false;
         return false;
     }
 
@@ -126,6 +143,7 @@ static bool CopyTextToClipboard(const std::wstring& text) {
     HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
     if (!memory) {
         CloseClipboard();
+        g_suppressClipboardCapture = false;
         return false;
     }
 
@@ -133,6 +151,7 @@ static bool CopyTextToClipboard(const std::wstring& text) {
     if (!locked) {
         GlobalFree(memory);
         CloseClipboard();
+        g_suppressClipboardCapture = false;
         return false;
     }
 
@@ -140,7 +159,43 @@ static bool CopyTextToClipboard(const std::wstring& text) {
     GlobalUnlock(memory);
     SetClipboardData(CF_UNICODETEXT, memory);
     CloseClipboard();
+    g_suppressClipboardCapture = false;
     return true;
+}
+
+static void CaptureClipboardText() {
+    if (g_suppressClipboardCapture) {
+        return;
+    }
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+        return;
+    }
+    if (!OpenClipboard(g_hwnd)) {
+        return;
+    }
+
+    HANDLE data = GetClipboardData(CF_UNICODETEXT);
+    if (!data) {
+        CloseClipboard();
+        return;
+    }
+
+    const wchar_t* text = static_cast<const wchar_t*>(GlobalLock(data));
+    if (!text) {
+        CloseClipboard();
+        return;
+    }
+
+    const SIZE_T bytes = GlobalSize(data);
+    size_t charCount = bytes / sizeof(wchar_t);
+    if (charCount > 0 && text[charCount - 1] == L'\0') {
+        --charCount;
+    }
+    std::wstring captured(text, charCount);
+    GlobalUnlock(data);
+    CloseClipboard();
+
+    g_clipboardHistory.Push(std::move(captured));
 }
 
 void ApplyWindowEffects(HWND hwnd) {
@@ -201,6 +256,7 @@ bool CreateOverlayWindow(HINSTANCE instance) {
 
     ApplyWindowEffects(g_hwnd);
     RegisterHotKey(g_hwnd, kHotkeyId, MOD_CONTROL, VK_SPACE);
+    AddClipboardFormatListener(g_hwnd);
     return true;
 }
 
@@ -357,6 +413,24 @@ void LaunchSelected() {
             return;
         } else {
             ++rowOffset;
+        }
+    }
+
+    if (g_clipboardQuery) {
+        if (g_clipboardMatches.empty()) {
+            if (g_selectedIndex == rowOffset) {
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int clipIndex = g_selectedIndex - rowOffset;
+            if (clipIndex >= 0 && clipIndex < static_cast<int>(g_clipboardMatches.size())) {
+                const std::wstring text = g_clipboardMatches[static_cast<size_t>(clipIndex)];
+                CloseOverlay();
+                CopyTextToClipboard(text);
+                return;
+            }
+            rowOffset += static_cast<int>(g_clipboardMatches.size());
         }
     }
 
@@ -522,6 +596,12 @@ static void HandleCommand(WPARAM wParam) {
             g_killProcesses = FindProcessesByName(g_systemCommand->processName);
         } else {
             g_killProcesses.clear();
+        }
+        g_clipboardQuery = TryParseClipboardQuery(buffer);
+        if (g_clipboardQuery) {
+            g_clipboardMatches = g_clipboardHistory.Match(g_clipboardQuery->filter);
+        } else {
+            g_clipboardMatches.clear();
         }
         g_selectedIndex = 0;
         ResizeOverlayToResults();
@@ -701,6 +781,46 @@ static void PaintResultRow(
         }
     }
 
+    if (g_clipboardQuery) {
+        if (g_clipboardMatches.empty()) {
+            if (index == rowOffset) {
+                const std::wstring emptyLabel = g_clipboardQuery->filter.empty()
+                    ? L"Historial vac\u00EDo"
+                    : L"Ning\u00FAn texto coincide";
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    emptyLabel.c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int clipIndex = index - rowOffset;
+            if (clipIndex >= 0 && clipIndex < static_cast<int>(g_clipboardMatches.size())) {
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    g_clipboardMatches[static_cast<size_t>(clipIndex)].c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            rowOffset += static_cast<int>(g_clipboardMatches.size());
+        }
+    }
+
     const int appIndex = index - SpecialRowCount();
     if (appIndex >= 0 && appIndex < static_cast<int>(g_visibleIcons.size())
         && g_visibleIcons[appIndex].icon) {
@@ -772,6 +892,7 @@ static void HandlePaint(HWND hwnd) {
 static void HandleDestroy(HWND hwnd) {
     KillTimer(hwnd, kIconTimerId);
     UnregisterHotKey(hwnd, kHotkeyId);
+    RemoveClipboardFormatListener(hwnd);
     ReleaseIndexedApps();
     if (g_hFont) {
         DeleteObject(g_hFont);
@@ -837,6 +958,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             SyncVisibleIcons();
             InvalidateRect(hwnd, nullptr, FALSE);
         }
+        return 0;
+
+    case WM_CLIPBOARDUPDATE:
+        CaptureClipboardText();
         return 0;
 
     case WM_DESTROY:
