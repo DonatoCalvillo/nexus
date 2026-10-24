@@ -160,6 +160,7 @@
     <ClCompile Include="src\PortLookup.cpp" />
     <ClCompile Include="src\SystemCommands.cpp" />
     <ClCompile Include="src\ClipboardHistory.cpp" />
+    <ClCompile Include="src\FileSearch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Constants.h" />
@@ -174,8 +175,15 @@
     <ClInclude Include="include\PortLookup.h" />
     <ClInclude Include="include\SystemCommands.h" />
     <ClInclude Include="include\ClipboardHistory.h" />
+    <ClInclude Include="include\FileSearch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyEverythingDll" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(ProjectDir)..\third_party\Everything\Everything64.dll"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
 </Project>

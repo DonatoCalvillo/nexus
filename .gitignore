@@ -23,6 +23,10 @@ Nexus/x86/
 *.lib
 *.dll
 *.exe
+
+# Keep vendored Everything SDK binaries
+!third_party/Everything/
+!third_party/Everything/**
 *.recipe
 *.tlog
 *.log

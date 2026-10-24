@@ -105,6 +105,7 @@ int RunWebSearchTests();
 int RunPortLookupTests();
 int RunSystemCommandsTests();
 int RunClipboardHistoryTests();
+int RunFileSearchTests();
 
 int wmain() {
     TestSuccessfulEvaluations();
@@ -116,8 +117,9 @@ int wmain() {
     const int portLookupFailures = RunPortLookupTests();
     const int systemCommandsFailures = RunSystemCommandsTests();
     const int clipboardHistoryFailures = RunClipboardHistoryTests();
+    const int fileSearchFailures = RunFileSearchTests();
     const int totalFailures = calculatorFailures + webSearchFailures + portLookupFailures
-        + systemCommandsFailures + clipboardHistoryFailures;
+        + systemCommandsFailures + clipboardHistoryFailures + fileSearchFailures;
 
     if (totalFailures == 0) {
         std::wcout << L"All tests passed.\n";
