@@ -103,6 +103,7 @@ void TestLimits() {
 
 int RunWebSearchTests();
 int RunPortLookupTests();
+int RunSystemCommandsTests();
 
 int wmain() {
     TestSuccessfulEvaluations();
@@ -112,7 +113,9 @@ int wmain() {
     const int calculatorFailures = g_failures;
     const int webSearchFailures = RunWebSearchTests();
     const int portLookupFailures = RunPortLookupTests();
-    const int totalFailures = calculatorFailures + webSearchFailures + portLookupFailures;
+    const int systemCommandsFailures = RunSystemCommandsTests();
+    const int totalFailures =
+        calculatorFailures + webSearchFailures + portLookupFailures + systemCommandsFailures;
 
     if (totalFailures == 0) {
         std::wcout << L"All tests passed.\n";
