@@ -12,7 +12,9 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Indexes Windows Apps folder plus Start Menu shortcuts
 - Substring search with up to 5 results
 - Simple arithmetic (`10*1`, `100 / 2 * .5 + 19`): result appears as a row; `Enter` copies it (max 64 characters, 15 digits per number)
-- Keyboard navigation: `↑` / `↓`, `Enter` to launch or copy, `Esc` to dismiss
+- Direct web search shortcuts: `g <query>` (Google), `yt <video>` (YouTube), `gh <repo>` (GitHub), `so <error>` (Stack Overflow) — `Enter` opens the default browser
+- Direct URLs: queries starting with `http://` / `https://`, or hosts like `example.com` / `localhost:3000`, show **Abrir URL** as the first result
+- Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, or open URL, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
 ## Download / install (end users)
@@ -42,7 +44,12 @@ Disable login startup:
 | --- | --- |
 | Show / hide overlay | `Ctrl+Space` |
 | Move selection | `↑` / `↓` |
-| Launch selected app / copy calculation | `Enter` |
+| Launch selected app / copy calculation / open URL | `Enter` |
+| Google search | `g <query>` |
+| YouTube search | `yt <video>` |
+| GitHub search | `gh <repo>` |
+| Stack Overflow search | `so <error>` |
+| Open URL in browser | `https://…`, `example.com`, `localhost:3000` |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |
@@ -63,7 +70,7 @@ msbuild Nexus.slnx /p:Configuration=Release /p:Platform=x64
 
 Output: `x64\Release\Nexus.exe`
 
-### Run calculator tests
+### Run unit tests
 
 ```powershell
 msbuild tests\Nexus.Tests.vcxproj /p:Configuration=Release /p:Platform=x64
@@ -118,6 +125,7 @@ CI (`.github/workflows/ci.yml`) builds Nexus and runs the calculator test suite 
 Nexus/
 ├── include/           # Public headers
 │   ├── Calculator.h
+│   ├── WebSearch.h
 │   ├── Constants.h
 │   ├── Types.h
 │   ├── StringUtils.h
@@ -130,11 +138,13 @@ Nexus/
 │   ├── StringUtils.cpp
 │   ├── AppIndexer.cpp
 │   ├── Calculator.cpp
+│   ├── WebSearch.cpp
 │   ├── IconManager.cpp
 │   ├── Overlay.cpp
 │   └── Startup.cpp
 ├── tests/
 │   ├── CalculatorTests.cpp
+│   ├── WebSearchTests.cpp
 │   └── Nexus.Tests.vcxproj
 ├── installer/
 │   └── Nexus.iss      # Inno Setup script
@@ -148,6 +158,7 @@ Nexus/
 | --- | --- |
 | `AppIndexer` | Enumerate apps, apply search filter |
 | `Calculator` | Detect and evaluate simple arithmetic expressions |
+| `WebSearch` | Prefix searches and direct URL / host detection |
 | `IconManager` | Resolve and cache visible icons |
 | `Overlay` | Window UI, hotkey, painting |
 | `Startup` | Enable/disable launch on Windows sign-in |
