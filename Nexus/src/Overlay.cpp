@@ -4,6 +4,7 @@
 #include "Calculator.h"
 #include "Constants.h"
 #include "IconManager.h"
+#include "PortLookup.h"
 #include "WebSearch.h"
 
 #include <commctrl.h>
@@ -11,6 +12,7 @@
 #include <dwmapi.h>
 #include <optional>
 #include <string>
+#include <vector>
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Dwmapi.lib")
@@ -26,9 +28,26 @@ HBRUSH g_bgBrush = nullptr;
 int g_selectedIndex = 0;
 static std::optional<WebAction> g_webAction;
 static std::optional<CalcResult> g_calcResult;
+static std::optional<std::uint16_t> g_portQuery;
+static std::vector<PortProcess> g_portProcesses;
+
+static int PortRowCount() {
+    if (!g_portQuery) {
+        return 0;
+    }
+    if (g_portProcesses.empty()) {
+        return 1;
+    }
+    return static_cast<int>(g_portProcesses.size());
+}
 
 static int SpecialRowCount() {
-    return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0);
+    return (g_webAction ? 1 : 0) + (g_calcResult ? 1 : 0) + PortRowCount();
+}
+
+static std::wstring FormatPortProcessLabel(const PortProcess& process) {
+    return process.processName + L" - PID " + std::to_wstring(process.pid) + L" | "
+        + process.protocolLabel + L" | puerto " + std::to_wstring(process.port);
 }
 
 static int VisibleRowCount() {
@@ -206,11 +225,49 @@ void LaunchSelected() {
         ++rowOffset;
     }
 
-    if (g_calcResult && g_selectedIndex == rowOffset) {
-        const std::wstring resultText = g_calcResult->formattedValue;
-        CloseOverlay();
-        CopyTextToClipboard(resultText);
-        return;
+    if (g_calcResult) {
+        if (g_selectedIndex == rowOffset) {
+            const std::wstring resultText = g_calcResult->formattedValue;
+            CloseOverlay();
+            CopyTextToClipboard(resultText);
+            return;
+        }
+        ++rowOffset;
+    }
+
+    if (g_portQuery) {
+        if (g_portProcesses.empty()) {
+            if (g_selectedIndex == rowOffset) {
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int portIndex = g_selectedIndex - rowOffset;
+            if (portIndex >= 0 && portIndex < static_cast<int>(g_portProcesses.size())) {
+                const PortProcess process = g_portProcesses[static_cast<size_t>(portIndex)];
+                CloseOverlay();
+
+                const std::wstring message = L"\u00BFTerminar " + process.processName + L" (PID "
+                    + std::to_wstring(process.pid) + L") en el puerto "
+                    + std::to_wstring(process.port) + L"?";
+                const int answer = MessageBoxW(
+                    nullptr,
+                    message.c_str(),
+                    L"Nexus",
+                    MB_YESNO | MB_ICONWARNING | MB_TASKMODAL);
+                if (answer == IDYES) {
+                    if (!KillProcessByPid(process.pid)) {
+                        MessageBoxW(
+                            nullptr,
+                            L"No se pudo terminar el proceso. Puede requerir permisos elevados.",
+                            L"Nexus",
+                            MB_OK | MB_ICONERROR | MB_TASKMODAL);
+                    }
+                }
+                return;
+            }
+            rowOffset += static_cast<int>(g_portProcesses.size());
+        }
     }
 
     const int appIndex = g_selectedIndex - SpecialRowCount();
@@ -364,6 +421,12 @@ static void HandleCommand(WPARAM wParam) {
         UpdateFilter(buffer);
         g_webAction = TryParseWebAction(buffer);
         g_calcResult = TryEvaluate(buffer);
+        g_portQuery = TryParsePortQuery(buffer);
+        if (g_portQuery) {
+            g_portProcesses = FindProcessesByPort(*g_portQuery);
+        } else {
+            g_portProcesses.clear();
+        }
         g_selectedIndex = 0;
         ResizeOverlayToResults();
     }
@@ -417,26 +480,70 @@ static void PaintResultRow(
         ++rowOffset;
     }
 
-    if (g_calcResult && index == rowOffset) {
-        RECT equalsRect = {
-            itemRect.left + 12,
-            itemTop + 6,
-            itemRect.left + 36,
-            itemRect.bottom};
-        DrawTextW(deviceContext, L"=", -1, &equalsRect, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
+    if (g_calcResult) {
+        if (index == rowOffset) {
+            RECT equalsRect = {
+                itemRect.left + 12,
+                itemTop + 6,
+                itemRect.left + 36,
+                itemRect.bottom};
+            DrawTextW(deviceContext, L"=", -1, &equalsRect, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
 
-        RECT textRect = {
-            itemRect.left + 44,
-            itemTop + 6,
-            itemRect.right - 14,
-            itemRect.bottom};
-        DrawTextW(
-            deviceContext,
-            g_calcResult->formattedValue.c_str(),
-            -1,
-            &textRect,
-            DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
-        return;
+            RECT textRect = {
+                itemRect.left + 44,
+                itemTop + 6,
+                itemRect.right - 14,
+                itemRect.bottom};
+            DrawTextW(
+                deviceContext,
+                g_calcResult->formattedValue.c_str(),
+                -1,
+                &textRect,
+                DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            return;
+        }
+        ++rowOffset;
+    }
+
+    if (g_portQuery) {
+        if (g_portProcesses.empty()) {
+            if (index == rowOffset) {
+                const std::wstring emptyLabel =
+                    L"Ning\u00FAn proceso en el puerto " + std::to_wstring(*g_portQuery);
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    emptyLabel.c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            ++rowOffset;
+        } else {
+            const int portIndex = index - rowOffset;
+            if (portIndex >= 0 && portIndex < static_cast<int>(g_portProcesses.size())) {
+                const std::wstring label =
+                    FormatPortProcessLabel(g_portProcesses[static_cast<size_t>(portIndex)]);
+                RECT textRect = {
+                    itemRect.left + 14,
+                    itemTop + 6,
+                    itemRect.right - 14,
+                    itemRect.bottom};
+                DrawTextW(
+                    deviceContext,
+                    label.c_str(),
+                    -1,
+                    &textRect,
+                    DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+                return;
+            }
+            rowOffset += static_cast<int>(g_portProcesses.size());
+        }
     }
 
     const int appIndex = index - SpecialRowCount();

@@ -14,7 +14,8 @@ It stays resident in the background (no tray required): the overlay hides when y
 - Simple arithmetic (`10*1`, `100 / 2 * .5 + 19`): result appears as a row; `Enter` copies it (max 64 characters, 15 digits per number)
 - Direct web search shortcuts: `g <query>` (Google), `yt <video>` (YouTube), `gh <repo>` (GitHub), `so <error>` (Stack Overflow) — `Enter` opens the default browser
 - Direct URLs: queries starting with `http://` / `https://`, or hosts like `example.com` / `localhost:3000`, show **Abrir URL** as the first result
-- Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, or open URL, `Esc` to dismiss
+- Port process lookup: `-p <port>` lists the process listening on that TCP/UDP port; `Enter` asks for confirmation before terminating it
+- Keyboard navigation: `↑` / `↓`, `Enter` to launch, copy, open URL, or kill a port process, `Esc` to dismiss
 - Windows 11 DWM acrylic backdrop and rounded corners
 
 ## Download / install (end users)
@@ -50,6 +51,8 @@ Disable login startup:
 | GitHub search | `gh <repo>` |
 | Stack Overflow search | `so <error>` |
 | Open URL in browser | `https://…`, `example.com`, `localhost:3000` |
+| Find process by port | `-p <port>` (e.g. `-p 3000`) |
+| Kill process on port | Select result → `Enter` → confirm in dialog |
 | Close overlay | `Esc` or click away |
 | Start hidden (background) | `Nexus.exe --autostart` |
 | Register login startup | `Nexus.exe --install-startup` |

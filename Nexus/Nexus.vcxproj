@@ -157,6 +157,7 @@
     <ClCompile Include="src\Startup.cpp" />
     <ClCompile Include="src\Calculator.cpp" />
     <ClCompile Include="src\WebSearch.cpp" />
+    <ClCompile Include="src\PortLookup.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Constants.h" />
@@ -168,6 +169,7 @@
     <ClInclude Include="include\Startup.h" />
     <ClInclude Include="include\Calculator.h" />
     <ClInclude Include="include\WebSearch.h" />
+    <ClInclude Include="include\PortLookup.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
