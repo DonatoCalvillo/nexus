@@ -45,12 +45,27 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build Release x64
+        shell: pwsh
         run: |
+          $outDir = Join-Path $env:GITHUB_WORKSPACE "x64\Release"
+          $intDir = Join-Path $env:GITHUB_WORKSPACE "x64\Release\obj"
+          New-Item -ItemType Directory -Force -Path $outDir, $intDir | Out-Null
+          # Trailing slash required by MSBuild; use / to avoid PowerShell quote escaping.
           msbuild Nexus\Nexus.vcxproj `
             /p:Configuration=Release `
             /p:Platform=x64 `
             /p:PlatformToolset=v143 `
+            "/p:OutDir=$($outDir -replace '\\','/')/" `
+            "/p:IntDir=$($intDir -replace '\\','/')/" `
             /m
+          $exe = Join-Path $outDir "Nexus.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Host "Looking for Nexus.exe under workspace..."
+            Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter Nexus.exe -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty FullName
+            throw "Nexus.exe was not produced at $exe"
+          }
+          Write-Host "Built: $exe"
 
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
@@ -63,11 +78,17 @@ jobs:
           if (-not (Test-Path $iscc)) {
             throw "ISCC.exe not found at $iscc"
           }
+          if (-not (Test-Path "x64\Release\Nexus.exe")) {
+            throw "Missing x64\Release\Nexus.exe before Inno Setup"
+          }
           & $iscc `
             "/DMyAppVersion=${{ steps.version.outputs.version }}" `
             "/DMyAppURL=https://github.com/${{ github.repository }}" `
             "/DMyAppPublisher=${{ github.repository_owner }}" `
             installer\Nexus.iss
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE"
+          }
 
       - name: Stage portable zip
         shell: pwsh
